@@ -35,6 +35,7 @@ async function run() {
     await client.connect();
     const userCollection = client.db("studentScholarship").collection("users");
     const scholarshipCollection = client.db("studentScholarship").collection("scholarship");
+    const reviewCollection = client.db("studentScholarship").collection("review");
 
     app.post('/jwt', async(req, res) =>{
         const user = req.body;
@@ -59,10 +60,55 @@ async function run() {
         res.send(result);
       })
 
-      app.get('/scholarship', async(req, res) => {
-        const result = await scholarshipCollection.find().toArray();
-        res.send(result);
-      })
+      app.get('/scholarship', async (req, res) => {
+        try {
+            const page = parseInt(req.query.page) || 0;
+            const size = parseInt(req.query.size) || 10;
+            const search = req.query.search || '';
+            const applicationFees = req.query.applicationFees;
+    
+            let query = {
+                $or: [
+                    { universityName: { $regex: search, $options: 'i' } },
+                    { subjectName: { $regex: search, $options: 'i' } }
+                ]
+            };
+    
+            let sortOptions = {};
+            if (applicationFees) {
+                sortOptions.applicationFees = applicationFees === 'asc' ? 1 : -1;
+            }
+    
+            const result = await scholarshipCollection.find(query)
+                .sort(sortOptions)
+                .skip(page * size)
+                .limit(size)
+                .toArray();
+    
+            res.send(result);
+        } catch (error) {
+            res.status(500).send({ message: 'Error fetching scholarships', error });
+        }
+    });
+    
+    app.get('/scholarshipCount', async (req, res) => {
+        try {
+            const search = req.query.search || '';
+    
+            let query = {
+                $or: [
+                    { universityName: { $regex: search, $options: 'i' } },
+                    { subjectName: { $regex: search, $options: 'i' } }
+                ]
+            };
+    
+            const count = await scholarshipCollection.countDocuments(query);
+            res.send({ count });
+        } catch (error) {
+            res.status(500).send({ message: 'Error fetching scholarship count', error });
+        }
+    });
+    
 
       app.get("/scholarship/:id", async (req, res) => {
         const id = req.params.id;
@@ -70,6 +116,16 @@ async function run() {
         const result = await scholarshipCollection.findOne(query);
         res.send(result);
       });
+
+      app.get('/review', async(req, res) =>{
+        const result =await reviewCollection.find().toArray();
+        res.send(result);
+    })
+      app.post('/review', async(req, res) =>{
+        const query = req.body;
+        const result = await reviewCollection.insertOne(query);
+        res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
