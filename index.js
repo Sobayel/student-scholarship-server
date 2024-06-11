@@ -21,7 +21,6 @@ app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.xfjzvlh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -33,7 +32,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     await client.connect();
-    const userCollection = client.db("studentScholarship").collection("users");
+    const usersCollection = client.db("studentScholarship").collection("users");
     const scholarshipCollection = client.db("studentScholarship").collection("scholarship");
     const reviewCollection = client.db("studentScholarship").collection("review");
 
@@ -43,22 +42,67 @@ async function run() {
         res.send({token});
     })
 
+    app.get('/users/admin/:email', async (req, res) => {
+      const email = req.params.email
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'Forbidden Access' })
+      }
+      const query = { email: email }
+      const user = await usersCollection.findOne(query)
+      let admin = false
+      if (user) {
+        admin = user?.role === 'admin'
+      }
+      res.send({ admin })
+    })
+
+
 
     app.get('/users', async(req, res) => {
-        const result = await userCollection.find().toArray();
+        const result = await usersCollection.find().toArray();
         res.send(result);
       })
 
     app.post('/users', async (req, res) => {
         const user = req.body;
         const query = {email: user.email}
-        const existingUser = await userCollection.findOne(query);
+        const existingUser = await usersCollection.findOne(query);
         if(existingUser){
           return res.send({message: ' user already exists', insertedId: null})
         }
-        const result = await userCollection.insertOne(user);
+        const result = await usersCollection.insertOne(user);
         res.send(result);
       })
+
+      app.get('/users/moderator/:email', async (req, res) => {
+        const email = req.params.email
+        if (email !== req.decoded.email) {
+          return res.status(403).send({ message: 'Forbidden Access' })
+        }
+        const query = { email: email }
+        const user = await usersCollection.findOne(query)
+        let moderator = false
+        if (user) {
+          moderator = user?.role === 'moderator'
+        }
+        res.send({ moderator })
+      })
+
+      
+      app.get('/users/user/:email', async (req, res) => {
+        const email = req.params.email
+        console.log(email);
+        const query = { email: email }
+        const account = await usersCollection.findOne(query)
+        console.log('user check user:', account)
+        let user = false
+        if (account) {
+          user = account?.role === 'user'
+        }
+        console.log('user is:', user)
+        res.send({ user })
+      })
+  
 
       app.get('/scholarship', async (req, res) => {
         try {
