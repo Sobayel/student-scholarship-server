@@ -42,6 +42,7 @@ async function run() {
         res.send({token});
     })
 
+     // admin
     app.get('/users/admin/:email', async (req, res) => {
       const email = req.params.email
       if (email !== req.decoded.email) {
@@ -56,6 +57,36 @@ async function run() {
       res.send({ admin })
     })
 
+    // moderator
+    app.get('/users/moderator/:email', async (req, res) => {
+      const email = req.params.email
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'Forbidden Access' })
+      }
+      const query = { email: email }
+      const user = await usersCollection.findOne(query)
+      let moderator = false
+      if (user) {
+        moderator = user?.role === 'moderator'
+      }
+      res.send({ moderator })
+    })
+
+    // user
+    app.get('/users/user/:email', async (req, res) => {
+      const email = req.params.email
+      console.log(email);
+      const query = { email: email }
+      const account = await usersCollection.findOne(query)
+      console.log('user check user:', account)
+      let user = false
+      if (account) {
+        user = account?.role === 'user'
+      }
+      console.log('user is:', user)
+      res.send({ user })
+    })
+
 
 
     app.get('/users', async(req, res) => {
@@ -63,6 +94,7 @@ async function run() {
         res.send(result);
       })
 
+     
     app.post('/users', async (req, res) => {
         const user = req.body;
         const query = {email: user.email}
@@ -73,35 +105,8 @@ async function run() {
         const result = await usersCollection.insertOne(user);
         res.send(result);
       })
-
-      app.get('/users/moderator/:email', async (req, res) => {
-        const email = req.params.email
-        if (email !== req.decoded.email) {
-          return res.status(403).send({ message: 'Forbidden Access' })
-        }
-        const query = { email: email }
-        const user = await usersCollection.findOne(query)
-        let moderator = false
-        if (user) {
-          moderator = user?.role === 'moderator'
-        }
-        res.send({ moderator })
-      })
-
       
-      app.get('/users/user/:email', async (req, res) => {
-        const email = req.params.email
-        console.log(email);
-        const query = { email: email }
-        const account = await usersCollection.findOne(query)
-        console.log('user check user:', account)
-        let user = false
-        if (account) {
-          user = account?.role === 'user'
-        }
-        console.log('user is:', user)
-        res.send({ user })
-      })
+      
   
 
       app.get('/scholarship', async (req, res) => {
