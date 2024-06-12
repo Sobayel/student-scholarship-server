@@ -69,7 +69,16 @@ async function run() {
       next()
     }
     
+    // use verify Moderator verifyToken
+    const verifyModerator = async (req, res, next) => {
+      const user = req.user
+      const query = {email: user?.email}
+      const result = await usersCollection.findOne(query)
+      if(!result || result?.role !== 'moderator') 
+        return res.status(401).send({message: 'unauthorized access'})
 
+      next()
+    }
         
 
      // admin
