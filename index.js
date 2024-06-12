@@ -82,7 +82,25 @@ async function run() {
       }
       next();
     }
-        
+    
+     // create-payment-intent
+     app.post('/create-payment-intent',  async (req, res) => {
+      const price = req.body.price
+      const priceInCent = parseFloat(price) * 100
+      if (!price || priceInCent < 1) return
+      // generate clientSecret
+      const { client_secret } = await stripe.paymentIntents.create({
+        amount: priceInCent,
+        currency: 'usd',
+        // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      })
+      // send client secret as response
+      res.send({ clientSecret: client_secret })
+    })
+
     // .....................................................................
      // admin
     app.get('/users/admin/:email',verifyToken, async (req, res) => {
@@ -115,39 +133,21 @@ async function run() {
     })
 
     // user
-    app.get('/users/user/:email', async (req, res) => {
-      const email = req.params.email
-      console.log("server",email);
-      const query = { email: email }
-      const account = await usersCollection.findOne(query)
-      console.log('user check user:', account)
-      let user = false
-      if (account) {
-        user = account?.role === 'user'
-      }
-      console.log('user is:', user)
-      res.send({ user })
-    })
+   app.get('/users/user/:email', async (req, res) => {
+  const email = req.params.email;
+  console.log("server", email);
+  const query = { email: email };
+  const account = await usersCollection.findOne(query);
+  console.log('user check user:', account);
+  let user = false;
+  if (account) {
+    user = account?.role === 'user';
+  }
+  console.log('user is:', user);
+  res.send({ user });
+});
+
     // ....................................................................
-
-
-         // create-payment-intent
-         app.post('/create-payment-intent',  async (req, res) => {
-          const price = req.body.price
-          const priceInCent = parseFloat(price) * 100
-          if (!price || priceInCent < 1) return
-          // generate clientSecret
-          const { client_secret } = await stripe.paymentIntents.create({
-            amount: priceInCent,
-            currency: 'usd',
-            // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
-            automatic_payment_methods: {
-              enabled: true,
-            },
-          })
-          // send client secret as response
-          res.send({ clientSecret: client_secret })
-        })
 
 
 
@@ -170,12 +170,13 @@ async function run() {
 
       // ..................................................
 
-      app.patch('/users/admin/:id',verifyToken, async (req, res) =>{
+      app.patch('/users/:id',verifyToken, async (req, res) =>{
         const id = req.params.id;
+        const role = req.body.role;
         const filter = {_id: new ObjectId(id)};
         const updatedDoc = {
           $set: {
-            role: 'admin'
+            role: role,
           }
         }
         const result = await usersCollection.updateOne(filter, updatedDoc);
