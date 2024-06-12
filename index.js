@@ -42,10 +42,40 @@ async function run() {
         res.send({token});
     })
 
+      // middlewares
+  const verifyToken = (req, res, next) =>{
+    
+    if(!req.headers.authorization){
+      return res.status(401).send({message: 'unauthorized access'});
+    }
+    const token = req.headers.authorization.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded)=>{
+      if(error){
+        return res.status(401).send({message: 'unauthorized access'});
+      }
+      req.decoded= decoded;
+      next();
+    })
+  }
+
+    // use verify admin verifyToken
+    const verifyAdmin = async (req, res, next) => {
+      const user = req.user
+      const query = {email: user?.email}
+      const result = await usersCollection.findOne(query)
+      if(!result || result?.role !== 'admin') 
+        return res.status(401).send({message: 'unauthorized access'})
+
+      next()
+    }
+    
+
+        
+
      // admin
     app.get('/users/admin/:email', async (req, res) => {
       const email = req.params.email
-      if (email !== req.decoded.email) {
+      if (email !== req.decoded?.email) {
         return res.status(403).send({ message: 'Forbidden Access' })
       }
       const query = { email: email }
@@ -60,7 +90,7 @@ async function run() {
     // moderator
     app.get('/users/moderator/:email', async (req, res) => {
       const email = req.params.email
-      if (email !== req.decoded.email) {
+      if (email !== req.decoded?.email) {
         return res.status(403).send({ message: 'Forbidden Access' })
       }
       const query = { email: email }
@@ -88,6 +118,25 @@ async function run() {
     })
 
 
+         // create-payment-intent
+         app.post('/create-payment-intent',  async (req, res) => {
+          const price = req.body.price
+          const priceInCent = parseFloat(price) * 100
+          if (!price || priceInCent < 1) return
+          // generate clientSecret
+          const { client_secret } = await stripe.paymentIntents.create({
+            amount: priceInCent,
+            currency: 'usd',
+            // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+            automatic_payment_methods: {
+              enabled: true,
+            },
+          })
+          // send client secret as response
+          res.send({ clientSecret: client_secret })
+        })
+
+
 
     app.get('/users', async(req, res) => {
         const result = await usersCollection.find().toArray();
@@ -105,9 +154,7 @@ async function run() {
         const result = await usersCollection.insertOne(user);
         res.send(result);
       })
-      
-      
-  
+
 
       app.get('/scholarship', async (req, res) => {
         try {
