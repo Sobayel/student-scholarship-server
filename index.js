@@ -222,6 +222,12 @@ async function run() {
             res.status(500).send({ message: 'Error fetching scholarships', error });
         }
     });
+
+    app.post('/scholarship', async (req, res) =>{
+      const scholarshipData = req.body
+      const result = await scholarshipCollection.insertOne(scholarshipData)
+      res.send(result)
+    })
     
     app.get('/scholarshipCount', async (req, res) => {
         try {
