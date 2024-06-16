@@ -313,6 +313,12 @@ app.post('/applyPayment', (req, res) => {
         const result = await reviewCollection.insertOne(query);
         res.send(result);
     })
+
+    app.post('/appliedData', async(req, res) =>{
+      const query = req.body;
+      const result = await appliedDataCollection.insertOne(query);
+      res.send(result);
+  })
     
 
     // Send a ping to confirm a successful connection
