@@ -1,10 +1,13 @@
 const express = require('express');
+const SSLCommerzPayment = require('sslcommerz-lts')
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken')
 require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 9000;
+
+
 
 const corsData ={
   origin: [
@@ -16,6 +19,10 @@ const corsData ={
 
 app.use(cors(corsData));
 app.use(express.json());
+
+const store_id = process.env.SSl_Id;
+const store_passwd = process.env.SSL_Pass;
+const is_live = false 
 
 
 
@@ -35,6 +42,8 @@ async function run() {
     const usersCollection = client.db("studentScholarship").collection("users");
     const scholarshipCollection = client.db("studentScholarship").collection("scholarship");
     const reviewCollection = client.db("studentScholarship").collection("review");
+    const paymentCollection = client.db("studentScholarship").collection("payment");
+    const appliedDataCollection = client.db("studentScholarship").collection("appliedData");
 
     app.post('/jwt', async(req, res) =>{
         const user = req.body;
@@ -83,23 +92,55 @@ async function run() {
       next();
     }
     
-     // create-payment-intent
-     app.post('/create-payment-intent',  async (req, res) => {
-      const price = req.body.price
-      const priceInCent = parseFloat(price) * 100
-      if (!price || priceInCent < 1) return
-      // generate clientSecret
-      const { client_secret } = await stripe.paymentIntents.create({
-        amount: priceInCent,
-        currency: 'usd',
-        // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
-        automatic_payment_methods: {
-          enabled: true,
-        },
-      })
-      // send client secret as response
-      res.send({ clientSecret: client_secret })
-    })
+//sslcommerz init
+app.post('/applyPayment', (req, res) => {
+  const body = req.body
+  const tran_id = new ObjectId().toString()
+  console.log(body);
+  const data = {
+      total_amount: body.applicationFees,
+      currency: 'USD',
+      tran_id: tran_id, // use unique tran_id for each api call
+      success_url: `http://localhost:9000/applyScholar/${body._id}`,
+      fail_url: 'http://localhost:3030/fail',
+      cancel_url: 'http://localhost:3030/cancel',
+      ipn_url: 'http://localhost:3030/ipn',
+      shipping_method: 'Courier',
+      product_name: 'Computer.',
+      product_category: 'Electronic',
+      product_profile: 'general',
+      cus_name: 'Customer Name',
+      cus_email: 'customer@example.com',
+      cus_add1: 'Dhaka',
+      cus_add2: 'Dhaka',
+      cus_city: 'Dhaka',
+      cus_state: 'Dhaka',
+      cus_postcode: '1000',
+      cus_country: 'Bangladesh',
+      cus_phone: '01711111111',
+      cus_fax: '01711111111',
+      ship_name: 'Customer Name',
+      ship_add1: 'Dhaka',
+      ship_add2: 'Dhaka',
+      ship_city: 'Dhaka',
+      ship_state: 'Dhaka',
+      ship_postcode: 1000,
+      ship_country: 'Bangladesh',
+  };
+  console.log(data)
+  const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
+  sslcz.init(data).then(apiResponse => {
+      // Redirect the user to payment gateway
+      let GatewayPageURL = apiResponse.GatewayPageURL
+      res.send({url:GatewayPageURL})
+      console.log('Redirecting to: ', GatewayPageURL)
+  });
+  app.post('/applyScholar/:id', async(req, res)=>{
+    const id = req.params.id
+    console.log(id)
+    res.redirect(`http://localhost:5173/applyScholarshipForm/${id}`)
+})
+})
 
     // .....................................................................
      // admin
@@ -135,7 +176,6 @@ async function run() {
     // user
    app.get('/users/user/:email', async (req, res) => {
   const email = req.params.email;
-  console.log("server", email);
   const query = { email: email };
   const account = await usersCollection.findOne(query);
   console.log('user check user:', account);
@@ -255,15 +295,25 @@ async function run() {
         res.send(result);
       });
 
+      app.get("/singleItem/:id", async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await scholarshipCollection.findOne(query);
+        res.send(result);
+      });
+
+
       app.get('/review', async(req, res) =>{
         const result =await reviewCollection.find().toArray();
         res.send(result);
     })
+
       app.post('/review', async(req, res) =>{
         const query = req.body;
         const result = await reviewCollection.insertOne(query);
         res.send(result);
     })
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
