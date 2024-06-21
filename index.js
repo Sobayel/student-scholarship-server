@@ -1,32 +1,28 @@
 const express = require('express');
-const SSLCommerzPayment = require('sslcommerz-lts')
 const cors = require('cors');
+const SSLCommerzPayment = require('sslcommerz-lts')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken')
+const bodyParser = require('body-parser');
 require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 9000;
 
 
 
-const corsData ={
-  origin: [
-    'http://localhost:5173',
-  ],
-  credentials: true,
-  optionSuccessStatus: 200,
-}
-
-app.use(cors(corsData));
+app.use(cors());
 app.use(express.json());
-
-const store_id = process.env.SSl_Id;
-const store_passwd = process.env.SSL_Pass;
-const is_live = false 
+app.use(bodyParser.json());
 
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.xfjzvlh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
+
+
+const store_id=process.env.SSL_ID;
+const store_passwd=process.env.SSL_PASS;
+const is_live= false 
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -42,7 +38,6 @@ async function run() {
     const usersCollection = client.db("studentScholarship").collection("users");
     const scholarshipCollection = client.db("studentScholarship").collection("scholarship");
     const reviewCollection = client.db("studentScholarship").collection("review");
-    const paymentCollection = client.db("studentScholarship").collection("payment");
     const appliedDataCollection = client.db("studentScholarship").collection("appliedData");
 
     app.post('/jwt', async(req, res) =>{
@@ -92,54 +87,11 @@ async function run() {
       next();
     }
     
-//sslcommerz init
-app.post('/applyPayment', (req, res) => {
-  const body = req.body
-  const tran_id = new ObjectId().toString()
-  console.log(body);
-  const data = {
-      total_amount: body.applicationFees,
-      currency: 'USD',
-      tran_id: tran_id, // use unique tran_id for each api call
-      success_url: `http://localhost:9000/applyScholar/${body._id}`,
-      fail_url: 'http://localhost:3030/fail',
-      cancel_url: 'http://localhost:3030/cancel',
-      ipn_url: 'http://localhost:3030/ipn',
-      shipping_method: 'Courier',
-      product_name: 'Computer.',
-      product_category: 'Electronic',
-      product_profile: 'general',
-      cus_name: 'Customer Name',
-      cus_email: 'customer@example.com',
-      cus_add1: 'Dhaka',
-      cus_add2: 'Dhaka',
-      cus_city: 'Dhaka',
-      cus_state: 'Dhaka',
-      cus_postcode: '1000',
-      cus_country: 'Bangladesh',
-      cus_phone: '01711111111',
-      cus_fax: '01711111111',
-      ship_name: 'Customer Name',
-      ship_add1: 'Dhaka',
-      ship_add2: 'Dhaka',
-      ship_city: 'Dhaka',
-      ship_state: 'Dhaka',
-      ship_postcode: 1000,
-      ship_country: 'Bangladesh',
-  };
-  console.log(data)
-  const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
-  sslcz.init(data).then(apiResponse => {
-      // Redirect the user to payment gateway
-      let GatewayPageURL = apiResponse.GatewayPageURL
-      res.send({url:GatewayPageURL})
-      console.log('Redirecting to: ', GatewayPageURL)
-  });
-  app.post('/applyScholar/:id', async(req, res)=>{
-    const id = req.params.id
-    console.log(id)
-    res.redirect(`http://localhost:5173/applyScholarshipForm/${id}`)
-})
+
+app.post('/appliedData', async(req, res) =>{
+  const query = req.body;
+  const result = await appliedDataCollection.insertOne(query);
+  res.send(result);
 })
 
     // .....................................................................
@@ -268,6 +220,13 @@ app.post('/applyPayment', (req, res) => {
       const result = await scholarshipCollection.insertOne(scholarshipData)
       res.send(result)
     })
+
+    app.delete('/scholarship/:id', async (req, res) =>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await scholarshipCollection.deleteOne(query);
+      res.send(result);
+    })
     
     app.get('/scholarshipCount', async (req, res) => {
         try {
@@ -314,11 +273,51 @@ app.post('/applyPayment', (req, res) => {
         res.send(result);
     })
 
-    app.post('/appliedData', async(req, res) =>{
-      const query = req.body;
-      const result = await appliedDataCollection.insertOne(query);
-      res.send(result);
-  })
+
+    app.post('/applyPayment', async (req, res) =>{
+      const body = req.body;
+      const tran_id = new ObjectId().toString();
+      console.log(body)
+      const data = {
+        total_amount: body.applicationFees,
+        currency: 'BDT',
+        tran_id: tran_id, // use unique tran_id for each api call
+        success_url: 'http://localhost:3030/success',
+        fail_url: 'http://localhost:3030/fail',
+        cancel_url: 'http://localhost:3030/cancel',
+        ipn_url: 'http://localhost:3030/ipn',
+        shipping_method: 'Courier',
+        product_name: 'Computer.',
+        product_category: 'Electronic',
+        product_profile: 'general',
+        cus_name: 'Customer Name',
+        cus_email: 'customer@example.com',
+        cus_add1: 'Dhaka',
+        cus_add2: 'Dhaka',
+        cus_city: 'Dhaka',
+        cus_state: 'Dhaka',
+        cus_postcode: '1000',
+        cus_country: 'Bangladesh',
+        cus_phone: '01711111111',
+        cus_fax: '01711111111',
+        ship_name: 'Customer Name',
+        ship_add1: 'Dhaka',
+        ship_add2: 'Dhaka',
+        ship_city: 'Dhaka',
+        ship_state: 'Dhaka',
+        ship_postcode: 1000,
+        ship_country: 'Bangladesh',
+    };
+    const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
+    sslcz.init(data).then(apiResponse => {
+        // Redirect the user to payment gateway
+        let GatewayPageURL = apiResponse.GatewayPageURL
+        res.send(GatewayPageURL)
+        console.log('Redirecting to: ', GatewayPageURL)
+    });
+    })
+
+
     
 
     // Send a ping to confirm a successful connection
