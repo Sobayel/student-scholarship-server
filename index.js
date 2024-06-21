@@ -227,7 +227,24 @@ app.post('/appliedData', async(req, res) =>{
       const result = await scholarshipCollection.deleteOne(query);
       res.send(result);
     })
-    
+
+    app.put('/scholarship/:id', async(req, res) =>{
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const options = {upsert: true};
+      const scholarshipForm = req.body;
+      const scholarship = {
+          $set: {
+              scholarshipName: scholarshipForm.scholarshipName,
+              universityName: scholarshipForm.universityName,
+              subjectCategory: scholarshipForm.subjectCategory,
+              degree: scholarshipForm.degree,
+              applicationFees: scholarshipForm.applicationFees,
+          }
+      }
+      const result = await scholarshipCollection.updateOne(filter, scholarship,options );
+      res.send(result);
+  })
     app.get('/scholarshipCount', async (req, res) => {
         try {
             const search = req.query.search || '';
