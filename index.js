@@ -9,16 +9,11 @@ const app = express();
 const port = process.env.PORT || 9000;
 
 
-
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 
-
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.xfjzvlh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-
 
 const store_id=process.env.SSL_ID;
 const store_passwd=process.env.SSL_PASS;
@@ -39,6 +34,7 @@ async function run() {
     const scholarshipCollection = client.db("studentScholarship").collection("scholarship");
     const reviewCollection = client.db("studentScholarship").collection("review");
     const appliedDataCollection = client.db("studentScholarship").collection("appliedData");
+    const userReviewsCollection = client.db("studentScholarship").collection("userReviews");
 
     app.post('/jwt', async(req, res) =>{
         const user = req.body;
@@ -61,7 +57,6 @@ async function run() {
       next();
     })
   }
-
    
   // use verify admin verifyToken
   const verifyAdmin = async (req, res, next) =>{
@@ -87,13 +82,6 @@ async function run() {
       next();
     }
     
-
-app.post('/appliedData', async(req, res) =>{
-  const query = req.body;
-  const result = await appliedDataCollection.insertOne(query);
-  res.send(result);
-})
-
     // .....................................................................
      // admin
     app.get('/users/admin/:email',verifyToken, async (req, res) => {
@@ -109,7 +97,7 @@ app.post('/appliedData', async(req, res) =>{
       }
       res.send({ admin })
     })
-
+    
     // moderator
     app.get('/users/moderator/:email',verifyToken, async (req, res) => {
       const email = req.params.email
@@ -141,13 +129,17 @@ app.post('/appliedData', async(req, res) =>{
 
     // ....................................................................
 
-
-
     app.get('/users', async(req, res) => {
         const result = await usersCollection.find().toArray();
         res.send(result);
       })
 
+      app.get("/users/:email", async (req, res) => {
+        const email = req.params.email;
+        const query = {email:email};
+        const result = await usersCollection.findOne(query);
+        res.send(result);
+      });
      
     app.post('/users', async (req, res) => {
         const user = req.body;
@@ -160,9 +152,8 @@ app.post('/appliedData', async(req, res) =>{
         res.send(result);
       })
 
-      // ..................................................
 
-      app.patch('/users/:id',verifyToken, async (req, res) =>{
+      app.patch('/users/:id',verifyToken,verifyAdmin, async (req, res) =>{
         const id = req.params.id;
         const role = req.body.role;
         const filter = {_id: new ObjectId(id)};
@@ -175,13 +166,12 @@ app.post('/appliedData', async(req, res) =>{
         res.send(result);
       })
   
-      app.delete('/users/:id',verifyToken,verifyAdmin,async (req, res) =>{
+      app.delete('/users/:id',verifyToken, verifyAdmin,async (req, res) =>{
         const id = req.params.id;
         const query = {_id: new ObjectId(id)}
         const result = await usersCollection.deleteOne(query);
         res.send(result);
       })
-      // .........................................................
 
 
       app.get('/scholarship', async (req, res) => {
@@ -290,7 +280,7 @@ app.post('/appliedData', async(req, res) =>{
         res.send(result);
     })
 
-
+// Payment
     app.post('/applyPayment', async (req, res) =>{
       const body = req.body;
       const tran_id = new ObjectId().toString();
@@ -299,7 +289,7 @@ app.post('/appliedData', async(req, res) =>{
         total_amount: body.applicationFees,
         currency: 'BDT',
         tran_id: tran_id, // use unique tran_id for each api call
-        success_url: 'http://localhost:3030/success',
+        success_url: `http://localhost:9000/applyScholarshipForm/${body._id}`,
         fail_url: 'http://localhost:3030/fail',
         cancel_url: 'http://localhost:3030/cancel',
         ipn_url: 'http://localhost:3030/ipn',
@@ -325,17 +315,79 @@ app.post('/appliedData', async(req, res) =>{
         ship_postcode: 1000,
         ship_country: 'Bangladesh',
     };
+    console.log(data)
     const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
     sslcz.init(data).then(apiResponse => {
         // Redirect the user to payment gateway
         let GatewayPageURL = apiResponse.GatewayPageURL
-        res.send(GatewayPageURL)
+        res.send({url:GatewayPageURL})
         console.log('Redirecting to: ', GatewayPageURL)
     });
+
+    app.post('/applyScholarshipForm/:id', async(req, res)=>{
+      const id = req.params.id
+      console.log(id)
+      res.redirect(`http://localhost:5173/applyScholarshipForm/${id}`)
+  })
+    })
+
+    app.get('/appliedData', async(req, res) =>{
+      const result =await appliedDataCollection.find().toArray();
+      res.send(result);
+  })
+
+    app.post('/appliedData', async(req, res) =>{
+      const query = req.body;
+      const result = await appliedDataCollection.insertOne(query);
+      res.send(result);
+    })
+
+    app.delete('/appliedData/:id', async (req, res) =>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await appliedDataCollection.deleteOne(query);
+      res.send(result);
     })
 
 
-    
+    app.get('/userReviews', async(req, res) =>{
+      const result =await userReviewsCollection.find().toArray();
+      res.send(result);
+  })
+  app.get("/userReviews/:id", async (req, res) => {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await userReviewsCollection.findOne(query);
+    res.send(result);
+  });
+
+    app.post('/userReviews', async(req, res) =>{
+      const query = req.body;
+      const result = await userReviewsCollection.insertOne(query);
+      res.send(result);
+    })
+
+    app.put('/userReviews/:id', async(req, res) =>{
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const options = {upsert: true};
+      const reviewForm = req.body;
+      const review = {
+          $set: {
+              reviewComment: reviewForm.reviewComment,
+              universityName:reviewForm.universityName,
+          }
+      }
+      const result = await userReviewsCollection.updateOne(filter, review,options );
+      res.send(result);
+  })
+
+  app.delete('/userReviews/:id', async (req, res) =>{
+    const id = req.params.id;
+    const query = {_id: new ObjectId(id)}
+    const result = await userReviewsCollection.deleteOne(query);
+    res.send(result);
+  })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
